@@ -1,0 +1,49 @@
+[project]
+name = "ticketsolver-backend"
+version = "0.1.0"
+description = "TicketSolver — multi-agent support automation platform (backend)"
+requires-python = ">=3.11"
+
+# NOTE: decided-stack dependencies (see ../CLAUDE.md). Declared, NOT yet installed
+# or pinned. Pin to exact versions on the first `pip install` in a build session.
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "sqlalchemy",
+    "psycopg[binary]",          # PostgreSQL driver
+    "alembic",                  # DB migrations
+    "qdrant-client",            # Vector DB
+    "langgraph",                # Agent orchestration
+    "openai",                   # OpenAI-compatible client for NVIDIA NIM
+    "xgboost",                  # cost-routing + complexity/category classifier
+    "scikit-learn",             # baseline models + confidence calibration
+    "sentence-transformers",    # embeddings (fallback: NIM embedding endpoint)
+    "httpx",                    # async HTTP for tool calls
+    "websockets",               # WebSocket support
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

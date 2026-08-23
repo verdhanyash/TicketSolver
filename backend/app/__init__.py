@@ -1,0 +1,1 @@
+"""TicketSolver backend application package."""
