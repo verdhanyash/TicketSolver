@@ -1,0 +1,164 @@
+{
+  "generated_at": "2026-08-24T19:32:29+00:00",
+  "model_file": "ticket_classifier.joblib",
+  "config": {
+    "trained_at": "2026-08-24T19:32:23+00:00",
+    "seed": 42,
+    "n_estimators": 300,
+    "max_depth": 6,
+    "learning_rate": 0.2,
+    "tree_method": "hist",
+    "eval_metric": "mlogloss",
+    "train_rows": 9611,
+    "val_rows": 2060,
+    "evaluated_on": "validation",
+    "category_labels": [
+      "change",
+      "incident",
+      "problem",
+      "request"
+    ],
+    "severity_labels": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "sklearn_version": "1.8.0",
+    "xgboost_version": "3.4.1"
+  },
+  "dataset": {
+    "train_rows": 9611,
+    "val_rows": 2060,
+    "test_rows": 2060
+  },
+  "validation_metrics": {
+    "category": {
+      "accuracy": 0.8578,
+      "macro_f1": 0.8512,
+      "per_class": {
+        "change": {
+          "precision": 0.9848,
+          "recall": 0.9286,
+          "f1": 0.9559,
+          "support": 210
+        },
+        "incident": {
+          "precision": 0.7822,
+          "recall": 0.9217,
+          "f1": 0.8462,
+          "support": 830
+        },
+        "problem": {
+          "precision": 0.7692,
+          "recall": 0.5104,
+          "f1": 0.6137,
+          "support": 431
+        },
+        "request": {
+          "precision": 0.9816,
+          "recall": 0.9966,
+          "f1": 0.989,
+          "support": 589
+        }
+      }
+    },
+    "severity": {
+      "accuracy": 0.6199,
+      "macro_f1": 0.5899,
+      "per_class": {
+        "low": {
+          "precision": 0.7156,
+          "recall": 0.3561,
+          "f1": 0.4756,
+          "support": 424
+        },
+        "medium": {
+          "precision": 0.5787,
+          "recall": 0.7048,
+          "f1": 0.6355,
+          "support": 840
+        },
+        "high": {
+          "precision": 0.6465,
+          "recall": 0.6709,
+          "f1": 0.6584,
+          "support": 796
+        }
+      }
+    },
+    "dataset": {
+      "train_rows": 9611,
+      "val_rows": 2060,
+      "evaluated_on": "validation"
+    },
+    "seed": 42
+  },
+  "test_metrics": {
+    "category": {
+      "accuracy": 0.8553,
+      "macro_f1": 0.8501,
+      "per_class": {
+        "change": {
+          "precision": 0.9847,
+          "recall": 0.9234,
+          "f1": 0.9531,
+          "support": 209
+        },
+        "incident": {
+          "precision": 0.781,
+          "recall": 0.9193,
+          "f1": 0.8445,
+          "support": 830
+        },
+        "problem": {
+          "precision": 0.7653,
+          "recall": 0.522,
+          "f1": 0.6207,
+          "support": 431
+        },
+        "request": {
+          "precision": 0.9798,
+          "recall": 0.9847,
+          "f1": 0.9822,
+          "support": 590
+        }
+      }
+    },
+    "severity": {
+      "accuracy": 0.6155,
+      "macro_f1": 0.5899,
+      "per_class": {
+        "low": {
+          "precision": 0.708,
+          "recall": 0.3756,
+          "f1": 0.4908,
+          "support": 426
+        },
+        "medium": {
+          "precision": 0.5782,
+          "recall": 0.6969,
+          "f1": 0.632,
+          "support": 838
+        },
+        "high": {
+          "precision": 0.6359,
+          "recall": 0.6583,
+          "f1": 0.6469,
+          "support": 796
+        }
+      }
+    }
+  },
+  "gates": {
+    "category_macro_f1": {
+      "threshold": 0.6,
+      "value": 0.8501,
+      "verdict": "PASS"
+    },
+    "severity_macro_f1": {
+      "threshold": 0.4,
+      "value": 0.5899,
+      "verdict": "PASS"
+    }
+  }
+}
