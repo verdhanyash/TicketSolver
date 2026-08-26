@@ -1,24 +1,35 @@
 """FastAPI application entrypoint for TicketSolver.
 
-Wires up CORS, the REST API router, and the dashboard WebSocket. No agent, ML, or
-orchestration logic lives here — routes are stubs until later sessions (see CLAUDE.md).
+Wires up CORS, the REST API router, and the dashboard WebSocket. Agent logic lives in
+`app.agents`, flow control in `app.orchestration`; this module only composes them.
 
 Run: `uvicorn app.main:app --reload`
 """
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
-from app.api.websocket import register_websocket
+from app.api.websocket import capture_main_loop, register_websocket
 from app.config import settings
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Worker threads broadcast WS events onto this loop (M4).
+    capture_main_loop()
+    yield
+
 
 app = FastAPI(
     title="TicketSolver API",
     version="0.1.0",
     description="Multi-agent support-automation platform backend.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

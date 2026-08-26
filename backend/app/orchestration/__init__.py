@@ -1,5 +1,5 @@
 """Agent orchestration via LangGraph (FR-4).
 
-Stateful graph deciding next steps (resolve / retry / escalate) from agent outputs —
-not a fixed sequential pipeline. No logic yet — added in a later session.
+`graph.py` holds the orchestrator: a stateful wrapper around the Investigator deciding
+resolve / retry / escalate per outcome, with FR-5 short-term session context.
 """

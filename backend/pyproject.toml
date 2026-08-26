@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "TicketSolver — multi-agent support automation platform (backend)"
 requires-python = ">=3.11"
 
-# NOTE: decided-stack dependencies (see ../CLAUDE.md). Declared, NOT yet installed
-# or pinned. Pin to exact versions on the first `pip install` in a build session.
+# NOTE: decided-stack dependencies (see ../CLAUDE.md). Embeddings are served by a
+# local Ollama model (nomic-embed-text) over HTTP — sentence-transformers/torch is
+# deliberately NOT a dependency (user decision, 2026-08-23).
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
@@ -20,7 +21,6 @@ dependencies = [
     "openai",                   # OpenAI-compatible client for NVIDIA NIM
     "xgboost",                  # cost-routing + complexity/category classifier
     "scikit-learn",             # baseline models + confidence calibration
-    "sentence-transformers",    # embeddings (fallback: NIM embedding endpoint)
     "httpx",                    # async HTTP for tool calls
     "websockets",               # WebSocket support
 ]

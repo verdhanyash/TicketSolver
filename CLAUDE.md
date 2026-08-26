@@ -22,7 +22,7 @@ scale, built to run at **$0 on free tiers**, with **no real PII** (synthetic tic
 | Relational DB | **PostgreSQL** (Supabase / Neon free tier) | Tickets, long-term customer memory (FR-6), and trace logs (FR-10). Access via SQLAlchemy; migrations via Alembic. |
 | Vector DB | **Qdrant** (self-hosted, free) | Episodic memory (FR-7) + knowledge-base RAG. |
 | ML — classification | **XGBoost** + **scikit-learn** | Ticket category/severity classifier (FR-1), complexity→cost router (FR-14), confidence calibration (FR-15), logistic-regression baseline (SRS §6.3). |
-| Embeddings | **sentence-transformers** (fallback: NIM embedding endpoint) | Powers episodic memory + KB retrieval. Pretrained, not trained in-house. |
+| Embeddings | **Ollama serving `nomic-embed-text`** (local HTTP API) | Powers episodic memory + KB retrieval. User decision 2026-08-23: NOT NIM-hosted embeddings and NOT sentence-transformers (torch deliberately not installed). Vector dim 768, verified live. |
 | Frontend framework | **React + TypeScript** (Vite) | Dashboard, approval UI, ticket detail. |
 | 3D / trace viz | **Three.js via react-three-fiber + @react-three/drei** | Interactive animated agent-trace graph (FR-11, FR-19). |
 | Charts | **Recharts** | Dashboard metrics (FR-16). |
@@ -66,8 +66,17 @@ frontend/
 ```
 
 ## Conventions
+- **Dev services**: `backend/docker-compose.yml` runs local Postgres (:5433) + Qdrant
+  (:6333) containers for development; swap URLs to Neon/Supabase/cloud later without code
+  changes. KB lives in `backend/kb/*.md`; ingest with `scripts/ingest_kb.py` (idempotent).
+- **DB sessions**: always obtain the sessionmaker via `app.db.session.get_session_factory()`;
+  call it for a Session (`get_session_factory()()`), but pass the factory itself to helpers
+  like `TraceWriter`. Don't reintroduce alternate accessors.
+- **Commits**: authored plainly by the user only — never add AI co-author trailers or AI
+  names to commit messages or repo content.
 - **Config/secrets**: everything through `app/config.py` (pydantic-settings) / `.env`.
   Never hardcode secrets; `.env` is gitignored, `.env.example` is the template.
+  NIM_API_KEY is added by the user directly to `.env`, never pasted into chat.
 - **Guardrails are code, not prompts** (FR-3): risky-action limits live in `app/guardrails/`,
   enforced in application code — never delegated to the LLM.
 - **Auditability** (NFR): every autonomous action must trace to a logged reasoning chain.

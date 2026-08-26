@@ -35,3 +35,5 @@ each session, alongside `CLAUDE.md` (stack decisions) and the SRS
 10. **Confirm before destructive or hard-to-reverse actions**: dropping/altering DB schema,
     deleting data, force-pushing, mass edits, deploying, or anything affecting shared/live
     systems. Prefer non-destructive alternatives.
+11. **No AI attribution in the repo**: commit messages carry no co-author trailers and no AI
+    agent names anywhere in commits, docs, or code comments. Commits are the user's alone.

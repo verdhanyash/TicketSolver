@@ -1,6 +1,6 @@
 """Guardrails (FR-3).
 
-Hard-coded policy checks enforced in application code — NOT delegated to the LLM. Any
-action exceeding a threshold (e.g. refund > $50) is blocked and routed to the HITL queue.
-No logic yet — added in a later session.
+Hard-coded policy checks enforced in application code — NOT delegated to the LLM.
+`engine.py` parses proposed actions and evaluates the declarative rule set; blocked
+actions are routed to the HITL approval queue instead of executing autonomously.
 """

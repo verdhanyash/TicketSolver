@@ -26,3 +26,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# ---- Datasets (never commit raw data; see Docs/DATA.md) ----
+backend/data/
+
+# ---- Build artifacts ----
+*.tsbuildinfo

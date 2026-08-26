@@ -1,7 +1,9 @@
 """SQLAlchemy engine and session factory (PostgreSQL).
 
 The engine is created lazily so the app can be imported without a live DB (e.g. in tests
-or during scaffolding). Call `get_engine()` / `get_session()` where a connection is needed.
+or during scaffolding). `get_session_factory()` returns a `sessionmaker`; construct
+sessions from it (`session = get_session_factory()()`), or hand it to helpers like
+`TraceWriter` that expect the factory itself.
 """
 
 from __future__ import annotations
@@ -23,13 +25,14 @@ def get_engine() -> Engine:
 
 
 @lru_cache(maxsize=1)
-def _session_factory() -> sessionmaker[Session]:
+def get_session_factory() -> sessionmaker[Session]:
+    """Return the shared sessionmaker (construct Sessions by calling it)."""
     return sessionmaker(bind=get_engine(), autoflush=False, expire_on_commit=False)
 
 
 def get_session() -> Iterator[Session]:
     """FastAPI dependency yielding a scoped session."""
-    session = _session_factory()()
+    session = get_session_factory()()
     try:
         yield session
     finally:

@@ -1,0 +1,33 @@
+# Dev-only services for TicketSolver (production targets per SRS §7 are
+# Supabase/Neon for Postgres and self-hosted Qdrant; these containers stand in
+# locally at $0). Not exposed outside localhost.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketsolver-postgres
+    environment:
+      POSTGRES_USER: ticketsolver
+      POSTGRES_PASSWORD: ticketsolver
+      POSTGRES_DB: ticketsolver
+    ports:
+      - "5433:5432"   # host 5433 to avoid colliding with any local Postgres
+    volumes:
+      - ticketsolver_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketsolver"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ticketsolver-qdrant
+    ports:
+      - "6333:6333"   # REST
+      - "6334:6334"   # gRPC
+    volumes:
+      - ticketsolver_qdrant:/qdrant/storage
+
+volumes:
+  ticketsolver_pgdata:
+  ticketsolver_qdrant:
