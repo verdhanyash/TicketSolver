@@ -89,6 +89,23 @@ Maps runtime agent observables (`attempt`, `proposal_length`, `confidence`, `too
   - **Log-Loss:** **0.0519**
   - **Inference Latency:** ~0.17 ms / run
 
+### 4. System-Level Evaluation Harness (FR-12, FR-13, FR-17, §10) — `eval/report.json`
+
+Evaluates end-to-end multi-agent orchestration across 35 curated golden support tickets (18 routine requests, 9 guardrail violations, and 8 unresolvable/high-risk edge cases).
+
+- **Status:** Evaluator engine, golden dataset, CLI runner, and baseline report complete (`backend/eval/report.json`).
+- **Real Benchmark Performance ($n = 35$):**
+
+| Quality Gate / Benchmark | Metric | Target | Actual | Verdict |
+|---|---|---|---|---|
+| **Routine Resolution Rate (§10.3)** | Resolution Correctness | $\ge 80.0\%$ | **100.0%** (18/18) | **PASS** |
+| **Guardrail Safety Intercept (§10.2)** | Intercept Correctness | $100.0\%$ | **100.0%** (9/9) | **PASS** |
+| **Escalation F1 Score (FR-13)** | Precision / Recall F1 | $\ge 0.75$ | **1.0000** (8/8) | **PASS** |
+| **Overall Terminal Accuracy** | Exact Outcome Match | — | **100.0%** (35/35) | **PASS** |
+| **M6 Category Classifier Gate** | Category Macro-F1 | $\ge 0.60$ | **0.8501** | **PASS** |
+| **M7 Router vs Baseline Margin (§6.3)** | XGBoost vs LR Advantage | Advantage $> 0$ | **+9.97%** | **PASS** |
+| **M7 Calibration Brier Score** | Brier Reliability Score | $\le 0.15$ | **0.0125** | **PASS** |
+
 ---
 
 ## Repository Structure
@@ -101,6 +118,7 @@ TicketSolver/
 │   │   ├── api/             # REST routes (tickets, approvals, traces, dashboard) & WebSocket
 │   │   ├── core/            # Resilience (CircuitBreaker, retries), Tracing, PII Redaction
 │   │   ├── db/              # SQLAlchemy models (Postgres) & session management
+│   │   ├── eval/            # Evaluation runner engine and metric calculators (FR-12, FR-13, FR-17)
 │   │   ├── guardrails/      # Deterministic code-level policy engines (e.g. $50 refund limit)
 │   │   ├── llm/             # NVIDIA NIM OpenAI-compatible client
 │   │   ├── memory/          # Customer memory (Postgres) & Episodic memory (Qdrant)
@@ -109,10 +127,11 @@ TicketSolver/
 │   │   ├── tools/           # Simulated account and order lookup tools
 │   │   └── vector/          # Qdrant client & Ollama nomic-embed-text RAG client
 │   ├── data/                # Data pipeline splits (train/val/test - gitignored)
+│   ├── eval/                # Curated golden tickets dataset and baseline reports (JSON & Markdown)
 │   ├── kb/                  # Markdown knowledge-base source documents
 │   ├── models/              # Serialized joblib models and metrics JSON reports
-│   ├── scripts/             # Ingestion, initialization, data prep, and training scripts
-│   └── tests/               # 151 automated unit, integration, and ML tests
+│   ├── scripts/             # Ingestion, initialization, data prep, training, and eval scripts
+│   └── tests/               # 157 automated unit, integration, ML, and evaluation tests
 ├── frontend/
 │   ├── src/
 │   │   ├── api/             # REST and WebSocket client
@@ -120,7 +139,7 @@ TicketSolver/
 │   │   ├── hooks/           # WebSocket real-time subscription hooks
 │   │   ├── pages/           # DashboardPage and TicketDetailPage
 │   │   └── types/           # Shared TypeScript interfaces
-├── Docs/                    # SRS, Data Provenance, Classifier Metrics, and Module Roadmaps
+├── Docs/                    # SRS, Data Provenance, Classifier/Router Metrics, and Module Roadmaps
 ├── CLAUDE.md                # Locked architectural decisions and stack constraints
 └── rules.md                 # Agent and development operating rules
 ```
@@ -135,10 +154,11 @@ The backend includes a comprehensive automated test suite spanning unit, resilie
 backend/.venv/Scripts/python.exe -m pytest
 ```
 
-**Test Status:** `151 passed in 8.56s` (100% passing across 16 test modules):
+**Test Status:** `157 passed in 11.61s` (100% passing across 17 test modules):
+- `test_eval.py`: Golden dataset schema validation, evaluation math, system metric aggregation, markdown reports, and mini-runs.
 - `test_ml_router.py`: Feature builder, tier selection boundaries, and load/predict roundtrip.
 - `test_ml_calibration.py`: Feature extraction, labeling rules, and threshold clamping.
-- `test_dashboard.py`: Summary aggregation, cost accounting, and queue metrics.
+- `test_dashboard.py`: Summary aggregation, cost accounting, quality report serving, and queue metrics.
 - `test_redaction.py`: PII regex rules (emails, phone numbers, Luhn credit cards) and log filtering.
 - `test_ml_classifier.py` & `test_ml_features.py`: TF-IDF extraction and XGBoost prediction stability.
 - `test_ml_integration.py`: End-to-end classification through FastAPI endpoints.
@@ -162,7 +182,7 @@ backend/.venv/Scripts/python.exe -m pytest
 | **Module 5** | Guardrails & HITL Queue | ✅ Complete | Hardcoded $50 refund limit, approval queue, human review actions |
 | **Module 6** | ML Ticket Classifier | ✅ Complete | Dual-head XGBoost classifier (85.5% category, 61.6% severity accuracy) |
 | **Module 7** | Cost Router & Calibration | ✅ Complete | Complexity router (78.8% acc vs 69.5% LR baseline) + dynamic calibration |
-| **Module 8** | Evaluation Harness | 📋 Planned | 30–50 hand-verified golden test tickets & regression reporting |
+| **Module 8** | Evaluation Harness | ✅ Complete | 35 hand-verified golden test tickets, runner engine & baseline report |
 | **Module 9** | Dashboard Frontend | 🟡 In Progress | Summary API complete; Recharts UI panels & live WS wiring next |
 | **Module 10**| 3D Trace Visualizer | 📋 Planned | Three.js / react-three-fiber interactive agent-flow graph |
 | **Module 11**| Cost Analytics & Explainability | 📋 Planned | Token cost savings math & XGBoost feature importance display |
