@@ -65,12 +65,29 @@ Classifies ticket text into category and severity simultaneously via TF-IDF n-gr
 
 *(Note on Data Quality: Kaggle dataset `suraj520` was thoroughly tested and rejected on empirical evidence after proving to have synthetic random-noise labels independent of text. See [`Docs/CLASSIFIER_METRICS.md`](Docs/CLASSIFIER_METRICS.md) for full benchmark documentation).*
 
-### 2. Complexity & Cost Router (FR-14) — `app/ml/router.py`
-- Selects between cheap tier (`meta/llama-3.1-8b-instruct`) and strong tier (`meta/llama-3.1-70b-instruct`) models based on token length, syntax complexity, and predicted severity.
-- Paired with a Logistic Regression baseline (SRS §6.3).
+### 2. Complexity & Cost Router (FR-14) — `ticket_router.joblib`
 
-### 3. Decision Confidence Calibration (FR-15) — `app/ml/calibration.py`
-- Learns mapping from observable execution signals (attempt count, proposal length, tool call volume, tool errors) to calibrated probabilities $P(\text{correct})$ to dynamically tune escalation thresholds.
+Routes tickets to the cheap tier (`meta/llama-3.1-8b-instruct`) or strong tier (`meta/llama-3.1-70b-instruct`) based on 11 lexical, syntactic, and predicted category/severity features, paired with a Logistic Regression baseline (SRS §6.3).
+
+- **Status:** Trained, evaluated, and serving live ahead of the orchestrator (`_route_ticket`).
+- **Held-Out Test Set Performance ($n = 2,060$):**
+
+| Model | Accuracy | Macro-F1 | Simple F1 | Complex F1 | Inference Latency | Quality Gate | Status |
+|---|---|---|---|---|---|---|---|
+| **XGBoost Classifier** | **78.79%** (0.7879) | **0.7857** | **0.7639** | **0.8074** | ~2.21 ms / ticket | Macro-F1 $\ge 0.70$ | **PASS** |
+| **Logistic Regression Baseline** | **69.51%** (0.6951) | **0.6860** | **0.6323** | **0.7396** | ~1.45 ms / ticket | — | — |
+| **Comparison Advantage** | **+9.28%** | **+9.97%** | **+13.16%** | **+6.78%** | — | XGBoost $\ge$ Baseline | **PASS** |
+
+### 3. Decision Confidence Calibration (FR-15) — `confidence_calibration.joblib`
+
+Maps runtime agent observables (`attempt`, `proposal_length`, `confidence`, `tool_calls`, `tool_errored`) to $P(\text{decision correct})$ to dynamically adjust orchestrator escalation thresholds between $0.30$ and $0.90$.
+
+- **Status:** Trained, evaluated, and active in `decide_node` (`_calibrated_threshold`).
+- **Held-Out Test Performance ($n = 450$):**
+  - **Accuracy:** **1.0000** (Gate $\ge 0.80$ **PASS**)
+  - **Brier Score:** **0.0125** (Gate $\le 0.15$ **PASS**)
+  - **Log-Loss:** **0.0519**
+  - **Inference Latency:** ~0.17 ms / run
 
 ---
 
@@ -93,9 +110,9 @@ TicketSolver/
 │   │   └── vector/          # Qdrant client & Ollama nomic-embed-text RAG client
 │   ├── data/                # Data pipeline splits (train/val/test - gitignored)
 │   ├── kb/                  # Markdown knowledge-base source documents
-│   ├── models/              # Serialized joblib models and metrics.json
+│   ├── models/              # Serialized joblib models and metrics JSON reports
 │   ├── scripts/             # Ingestion, initialization, data prep, and training scripts
-│   └── tests/               # 136 automated unit, integration, and ML tests
+│   └── tests/               # 151 automated unit, integration, and ML tests
 ├── frontend/
 │   ├── src/
 │   │   ├── api/             # REST and WebSocket client
@@ -118,13 +135,15 @@ The backend includes a comprehensive automated test suite spanning unit, resilie
 backend/.venv/Scripts/python.exe -m pytest
 ```
 
-**Test Status:** `136 passed in 15.35s` (100% passing across 14 test modules):
+**Test Status:** `151 passed in 8.56s` (100% passing across 16 test modules):
+- `test_ml_router.py`: Feature builder, tier selection boundaries, and load/predict roundtrip.
+- `test_ml_calibration.py`: Feature extraction, labeling rules, and threshold clamping.
 - `test_dashboard.py`: Summary aggregation, cost accounting, and queue metrics.
 - `test_redaction.py`: PII regex rules (emails, phone numbers, Luhn credit cards) and log filtering.
 - `test_ml_classifier.py` & `test_ml_features.py`: TF-IDF extraction and XGBoost prediction stability.
 - `test_ml_integration.py`: End-to-end classification through FastAPI endpoints.
 - `test_guardrails.py`: Boundary verification ($49.99 allowed, $50.00 blocked) and HITL queue creation.
-- `test_orchestrator_unit.py`: Transition table, retry bounds, and resolution states.
+- `test_orchestrator_unit.py`: Transition table, retry bounds, router propagation, and calibrated threshold adjustments.
 - `test_resilience.py`: Exponential backoff, timeout handling, and CircuitBreaker trips.
 - `test_episodic.py` & `test_long_term.py`: Vector retrieval and relational customer memory.
 - `test_tools.py` & `test_tracing.py`: Account/order mock stores and relational trace logging.
@@ -142,7 +161,7 @@ backend/.venv/Scripts/python.exe -m pytest
 | **Module 4** | Orchestrator & Resilience | ✅ Complete | Multi-attempt graph, CircuitBreaker, retries, async jobs & WebSocket |
 | **Module 5** | Guardrails & HITL Queue | ✅ Complete | Hardcoded $50 refund limit, approval queue, human review actions |
 | **Module 6** | ML Ticket Classifier | ✅ Complete | Dual-head XGBoost classifier (85.5% category, 61.6% severity accuracy) |
-| **Module 7** | Cost Router & Calibration | 🟡 In Progress | Router & calibration modules implemented; wiring to graph in progress |
+| **Module 7** | Cost Router & Calibration | ✅ Complete | Complexity router (78.8% acc vs 69.5% LR baseline) + dynamic calibration |
 | **Module 8** | Evaluation Harness | 📋 Planned | 30–50 hand-verified golden test tickets & regression reporting |
 | **Module 9** | Dashboard Frontend | 🟡 In Progress | Summary API complete; Recharts UI panels & live WS wiring next |
 | **Module 10**| 3D Trace Visualizer | 📋 Planned | Three.js / react-three-fiber interactive agent-flow graph |

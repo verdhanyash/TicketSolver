@@ -98,6 +98,7 @@ class AgentState(TypedDict):
     ticket_id: str
     messages: Annotated[list[AnyMessage], add_messages]
     proposal: str  # set by finalize_node
+    model: str  # FR-14: cheap vs strong NIM model tier
 
 
 # --- Trace writer (module-level so tests can substitute a SQLite-backed one) ------
@@ -128,15 +129,16 @@ def _find_similar_incidents(text: str, ticket_id: str) -> list[dict]:
 
 
 # --- Nodes -------------------------------------------------------------------
-def _call_model(messages: list[AnyMessage]):
+def _call_model(messages: list[AnyMessage], model: str | None = None):
     """Single LLM invocation point (patch target for unit tests).
 
     Runs under the LLM reliability policy (retry/timeout/breaker, NFR Reliability).
     """
     from app.core.resilience import get_llm_policy
 
+    target_model = model or settings.nim_model_strong
     return get_llm_policy().call(
-        nim_chat, settings.nim_model_strong, [m.model_dump() for m in messages], TOOL_SCHEMAS
+        nim_chat, target_model, [m.model_dump() for m in messages], TOOL_SCHEMAS
     )
 
 
@@ -160,8 +162,13 @@ def _to_ai_message(response: Any):
 
 
 def investigator_node(state: AgentState) -> dict:
+    chosen_model = state.get("model") or settings.nim_model_strong
     start = time.perf_counter()
-    response = _call_model(state["messages"])
+    try:
+        response = _call_model(state["messages"], model=chosen_model)
+    except TypeError:
+        # Backward compatibility with unit test mocks that accept only messages
+        response = _call_model(state["messages"])
     ai_msg = _to_ai_message(response)
     latency_ms = int((time.perf_counter() - start) * 1000)
     system_head = next((m.content for m in state["messages"] if isinstance(m, SystemMessage)), "")
@@ -177,7 +184,7 @@ def investigator_node(state: AgentState) -> dict:
             },
             output_payload={"content": ai_msg.content[:2000], "tool_calls": [tc["name"] for tc in ai_msg.tool_calls]},
             reasoning=(ai_msg.content or "")[:4000] or None,
-            model=settings.nim_model_strong,
+            model=chosen_model,
             latency_ms=latency_ms,
         )
     except Exception:  # tracing must never break resolution flow
@@ -270,12 +277,14 @@ def run_investigation(
     customer_id: str,
     *,
     follow_ups: list[str] | None = None,
+    model: str | None = None,
 ) -> str:
     """Entry point: investigate one loaded ticket and return the proposed resolution.
 
     `follow_ups` carries earlier conversation turns (FR-5 short-term memory) so
     multi-turn follow-up questions keep their context; each is appended as its own
     message after the initial ticket text.
+    `model` specifies the NIM model tier (FR-14); defaults to settings.nim_model_strong.
     """
     # Long-term customer memory (FR-6): load facts and prepend them to the system
     # prompt. Memory failure must never break resolution flow — degrade to no facts.
@@ -336,5 +345,7 @@ def run_investigation(
         ),
         *[HumanMessage(content=f"Follow-up: {turn}") for turn in (follow_ups or [])],
     ]
-    result = compiled_graph.invoke({"ticket_id": ticket_id, "messages": initial})
+    result = compiled_graph.invoke(
+        {"ticket_id": ticket_id, "messages": initial, "model": model or settings.nim_model_strong}
+    )
     return result.get("proposal", "")

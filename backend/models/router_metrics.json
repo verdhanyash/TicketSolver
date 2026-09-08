@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-09-08T19:39:39+00:00",
+  "model_file": "ticket_router.joblib",
+  "config": {
+    "seed": 42,
+    "n_estimators": 200,
+    "max_depth": 4,
+    "learning_rate": 0.1,
+    "train_rows": 9611,
+    "val_rows": 2060,
+    "test_rows": 2060
+  },
+  "thresholds": {
+    "total_word_threshold": 82.0,
+    "body_word_threshold": 77.0,
+    "word_quantile": 0.75
+  },
+  "validation_metrics": {
+    "xgboost": {
+      "accuracy": 0.7932,
+      "macro_f1": 0.7902,
+      "per_class": {
+        "simple": {
+          "precision": 0.7685,
+          "recall": 0.7618,
+          "f1": 0.7652,
+          "support": 911
+        },
+        "complex": {
+          "precision": 0.8124,
+          "recall": 0.8181,
+          "f1": 0.8153,
+          "support": 1149
+        }
+      }
+    },
+    "logistic_regression": {
+      "accuracy": 0.7267,
+      "macro_f1": 0.7177,
+      "per_class": {
+        "simple": {
+          "precision": 0.7225,
+          "recall": 0.6202,
+          "f1": 0.6675,
+          "support": 911
+        },
+        "complex": {
+          "precision": 0.7293,
+          "recall": 0.8111,
+          "f1": 0.768,
+          "support": 1149
+        }
+      }
+    },
+    "dataset": {
+      "train_rows": 9611,
+      "val_rows": 2060,
+      "evaluated_on": "validation",
+      "train_complex_fraction": 0.5482
+    },
+    "thresholds": {
+      "total_word_threshold": 82.0,
+      "body_word_threshold": 77.0,
+      "word_quantile": 0.75
+    },
+    "seed": 42
+  },
+  "test_metrics": {
+    "xgboost": {
+      "accuracy": 0.7879,
+      "macro_f1": 0.7857,
+      "per_class": {
+        "simple": {
+          "precision": 0.7812,
+          "recall": 0.7474,
+          "f1": 0.7639,
+          "support": 946
+        },
+        "complex": {
+          "precision": 0.7931,
+          "recall": 0.8223,
+          "f1": 0.8074,
+          "support": 1114
+        }
+      }
+    },
+    "logistic_regression": {
+      "accuracy": 0.6951,
+      "macro_f1": 0.686,
+      "per_class": {
+        "simple": {
+          "precision": 0.7087,
+          "recall": 0.5708,
+          "f1": 0.6323,
+          "support": 946
+        },
+        "complex": {
+          "precision": 0.6872,
+          "recall": 0.8007,
+          "f1": 0.7396,
+          "support": 1114
+        }
+      }
+    }
+  },
+  "gates": {
+    "complexity_macro_f1": {
+      "threshold": 0.7,
+      "value": 0.7857,
+      "verdict": "PASS"
+    },
+    "xgboost_vs_baseline": {
+      "xgb_f1": 0.7857,
+      "lr_f1": 0.686,
+      "verdict": "PASS"
+    }
+  }
+}

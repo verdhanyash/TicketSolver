@@ -49,7 +49,7 @@ _RETRY_NUDGE = (
 )
 
 
-class OrchestratorState(TypedDict):
+class OrchestratorState(TypedDict, total=False):
     ticket_id: str
     customer_id: str
     subject: str
@@ -61,6 +61,8 @@ class OrchestratorState(TypedDict):
     approval_id: str  # set when a guardrail block queues the action for review
     session_turns: list[str]  # FR-5: prior conversation, fixed for the run
     nudges: Annotated[list[str], operator.add]  # retry guidance, grows each loop
+    selected_model: str  # FR-14: cheap vs strong NIM model tier
+    complexity_label: str  # FR-14: simple vs complex
 
 
 # --- Pure decision logic (unit-test target) --------------------------------------
@@ -116,12 +118,14 @@ def _run_investigation(state: OrchestratorState) -> str:
     from app.agents.investigator import run_investigation
 
     follow_ups = [*state.get("session_turns", []), *state.get("nudges", [])]
+    model = state.get("selected_model") or settings.nim_model_strong
     return run_investigation(
         state["ticket_id"],
         state["subject"],
         state["body"],
         state["customer_id"],
         follow_ups=follow_ups,
+        model=model,
     )
 
 
@@ -223,6 +227,80 @@ def _triage_ticket(ticket_id: str, subject: str, body: str) -> None:
         logger.exception("ML triage failed for ticket %s; orchestration continues", ticket_id)
 
 
+def _route_ticket(ticket_id: str, subject: str, body: str) -> tuple[str, str]:
+    """Run FR-14 complexity routing: pick cheap vs strong NIM tier, trace it.
+
+    Best-effort: missing model or errors fall back to settings.nim_model_strong.
+    """
+    if not settings.router_enabled:
+        return settings.nim_model_strong, "complex"
+    category = ""
+    severity = ""
+    try:
+        with get_session_factory()() as session:
+            t = session.get(Ticket, ticket_id)
+            if t is not None:
+                category = t.category or ""
+                severity = t.severity or ""
+    except Exception:  # noqa: BLE001, S110
+        pass
+
+    try:
+        from app.ml.router import load_router
+
+        started = time.perf_counter()
+        decision = load_router().route(subject, body, category, severity)
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        _writer().log_step(
+            ticket_id=ticket_id,
+            step_type="ml_prediction",
+            name="cost_routing",
+            output_payload={
+                "complexity_label": decision.complexity_label,
+                "confidence": round(decision.confidence, 4),
+                "use_strong": decision.use_strong,
+                "selected_model": decision.selected_model,
+                "rationale": decision.rationale,
+            },
+            reasoning=f"Complexity router (FR-14): {decision.complexity_label} -> {decision.selected_model} ({decision.rationale})",
+            model=decision.selected_model,
+            latency_ms=latency_ms,
+        )
+        return decision.selected_model, decision.complexity_label
+    except Exception:
+        logger.warning("Complexity router unavailable for ticket %s; using strong model", ticket_id, exc_info=True)
+        return settings.nim_model_strong, "complex"
+
+
+def _calibrated_threshold(
+    *,
+    attempt: int,
+    proposal: str,
+    confidence: float,
+    base_threshold: float,
+) -> tuple[float, float | None]:
+    """FR-15 confidence calibration: map run observables to calibrated threshold.
+
+    Returns (effective_threshold, p_correct_or_none).
+    """
+    if not settings.calibration_enabled:
+        return base_threshold, None
+    try:
+        from app.ml.calibration import calibrated_threshold, load_calibration
+
+        calibrator = load_calibration()
+        p_correct = calibrator.predict_probability(
+            attempt=attempt,
+            proposal=proposal,
+            confidence=confidence,
+        )
+        threshold = calibrated_threshold(p_correct, base_threshold)
+        return threshold, p_correct
+    except Exception:
+        logger.warning("Confidence calibration unavailable; using base threshold", exc_info=True)
+        return base_threshold, None
+
+
 def investigate_node(state: OrchestratorState) -> dict:
     attempt = state["attempt"] + 1
     raw = _run_investigation(state)
@@ -232,28 +310,42 @@ def investigate_node(state: OrchestratorState) -> dict:
 
 def decide_node(state: OrchestratorState) -> dict:
     """Pure decision point: pick the next action from the outcome and trace it."""
+    base_thresh = settings.confidence_threshold
+    threshold, p_correct = _calibrated_threshold(
+        attempt=state["attempt"],
+        proposal=state["proposal"],
+        confidence=state["confidence"],
+        base_threshold=base_thresh,
+    )
     action = decide_next(
         attempt=state["attempt"],
         confidence=state["confidence"],
         proposal=state["proposal"],
+        threshold=threshold,
     )
     payload = {
         "attempt": state["attempt"],
         "confidence": round(state["confidence"], 3),
-        "threshold": settings.confidence_threshold,
+        "threshold": threshold,
+        "calibrated_threshold": threshold,
+        "base_threshold": base_thresh,
     }
+    if p_correct is not None:
+        payload["p_correct"] = p_correct
     if action == RESOLVE:
         _trace_decision(
             state["ticket_id"],
             "orchestrator_resolve",
             f"resolved autonomously on attempt {state['attempt']} "
-            f"(confidence {state['confidence']:.2f})",
+            f"(confidence {state['confidence']:.2f} >= threshold {threshold:.2f})",
             payload,
         )
         return {"outcome": RESOLVE}
     if action == ESCALATE:
         reason = (
-            "no usable proposal" if not state["proposal"].strip() else "confidence below threshold"
+            "no usable proposal"
+            if not state["proposal"].strip()
+            else f"confidence below threshold {threshold:.2f}"
         )
         _trace_decision(
             state["ticket_id"],
@@ -266,7 +358,7 @@ def decide_node(state: OrchestratorState) -> dict:
         state["ticket_id"],
         "orchestrator_retry",
         f"attempt {state['attempt']} not actionable "
-        f"(confidence {state['confidence']:.2f} < {settings.confidence_threshold}); retrying",
+        f"(confidence {state['confidence']:.2f} < threshold {threshold:.2f}); retrying",
         payload,
     )
     return {}  # routing falls through to the retry node
@@ -441,6 +533,7 @@ def process_ticket(
              "proposal": str, "attempts": int}.
     """
     _triage_ticket(ticket_id, subject, body)
+    selected_model, complexity_label = _route_ticket(ticket_id, subject, body)
     result = compiled_orchestrator.invoke(
         {
             "ticket_id": ticket_id,
@@ -453,6 +546,8 @@ def process_ticket(
             "outcome": "",
             "session_turns": list(session_turns or []),
             "nudges": [],
+            "selected_model": selected_model,
+            "complexity_label": complexity_label,
         }
     )
     # Public vocabulary is past tense ("resolved"/"escalated"); graph actions are not.

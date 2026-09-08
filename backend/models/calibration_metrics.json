@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-09-08T19:39:47+00:00",
+  "model_file": "confidence_calibration.joblib",
+  "config": {
+    "seed": 42,
+    "train_rows": 2100,
+    "val_rows": 450,
+    "test_rows": 450
+  },
+  "validation_metrics": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "log_loss": 0.053,
+    "reliability_bins": [
+      {
+        "range": "[0.00,0.60)",
+        "n": 359,
+        "mean_predicted": 0.0431,
+        "observed_rate": 0.0139
+      },
+      {
+        "range": "[0.60,0.70)",
+        "n": 5,
+        "mean_predicted": 0.6496,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "[0.70,0.80)",
+        "n": 7,
+        "mean_predicted": 0.758,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "[0.80,0.90)",
+        "n": 6,
+        "mean_predicted": 0.8698,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "[0.90,1.00]",
+        "n": 73,
+        "mean_predicted": 0.988,
+        "observed_rate": 1.0
+      }
+    ],
+    "dataset": {
+      "train_rows": 2100,
+      "val_rows": 450,
+      "evaluated_on": "validation",
+      "train_correct_fraction": 0.2429
+    },
+    "seed": 42
+  },
+  "test_metrics": {
+    "accuracy": 1.0,
+    "log_loss": 0.0519,
+    "brier_score": 0.0125,
+    "reliability_bins": [
+      {
+        "range": "[0.00,0.60)",
+        "n": 346,
+        "mean_predicted": 0.0407,
+        "observed_rate": 0.0202
+      },
+      {
+        "range": "[0.60,0.70)",
+        "n": 5,
+        "mean_predicted": 0.6621,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "[0.70,0.80)",
+        "n": 9,
+        "mean_predicted": 0.7621,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "[0.80,0.90)",
+        "n": 10,
+        "mean_predicted": 0.8503,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "[0.90,1.00]",
+        "n": 80,
+        "mean_predicted": 0.9855,
+        "observed_rate": 1.0
+      }
+    ]
+  },
+  "gates": {
+    "brier_score": {
+      "threshold": 0.15,
+      "value": 0.0125,
+      "verdict": "PASS"
+    },
+    "accuracy": {
+      "threshold": 0.8,
+      "value": 1.0,
+      "verdict": "PASS"
+    }
+  }
+}

@@ -34,6 +34,9 @@ from sklearn.pipeline import Pipeline
 VALID_CATEGORIES = ("change", "incident", "problem", "request")
 VALID_SEVERITIES = ("low", "medium", "high")
 
+CATEGORY_LABELS = VALID_CATEGORIES
+SEVERITY_LABELS = VALID_SEVERITIES
+
 
 def normalize_category(raw: str) -> str:
     """Normalize a raw category label to lowercase snake_case (e.g. 'Request').

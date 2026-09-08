@@ -302,7 +302,7 @@ def test_ml_triage_unavailable_leaves_row_and_trace_untouched(orch_env, monkeypa
         assert ticket.category is None
         assert ticket.severity is None
     steps = TraceWriter(factory).get_trace("tk-1")
-    assert not any(s["step_type"] == "ml_prediction" for s in steps)
+    assert not any(s["name"] == "ticket_classification" for s in steps)
     assert episodes  # the resolution path is unchanged
 
 
@@ -326,4 +326,74 @@ def test_ml_triage_failure_is_swallowed_not_fatal(orch_env, monkeypatch):
         ticket = session.get(Ticket, "tk-1")
         assert ticket.category is None and ticket.severity is None
     steps = TraceWriter(factory).get_trace("tk-1")
-    assert not any(s["step_type"] == "ml_prediction" for s in steps)
+    assert not any(s["name"] == "ticket_classification" for s in steps)
+
+
+def test_complexity_routing_step_and_model_propagation(orch_env, monkeypatch):
+    """FR-14 router decision traces as ml_prediction and selects the cheap model tier."""
+    from app.core.tracing import TraceWriter
+    from app.ml.router import RouterDecision
+
+    captured_models = []
+
+    def mock_investigate(state):
+        captured_models.append(state.get("selected_model"))
+        return "PROPOSED ACTION: refund $10\nCONFIDENCE: 0.9"
+
+    factory, _, _ = _script(monkeypatch, orch_env, ["PROPOSED ACTION: refund $10\nCONFIDENCE: 0.9"])
+    monkeypatch.setattr(orch, "_run_investigation", mock_investigate)
+
+    class MockRouter:
+        def route(self, subject, body, category="", severity=""):
+            return RouterDecision(
+                use_strong=False,
+                complexity_label=0,
+                confidence=0.95,
+                rationale="simple ticket",
+                selected_model="meta/llama-3.1-8b-instruct",
+            )
+
+    import app.ml.router as router_mod
+
+    monkeypatch.setattr(router_mod, "load_router", lambda *args, **kwargs: MockRouter())
+
+    orch.process_ticket("tk-router", "quick question", "how to cancel?", "CUST-1001")
+
+    # Assert investigator received cheap model
+    assert captured_models == ["meta/llama-3.1-8b-instruct"]
+
+    # Assert trace step was logged
+    steps = TraceWriter(factory).get_trace("tk-router")
+    route_steps = [s for s in steps if s["name"] == "cost_routing"]
+    assert len(route_steps) == 1
+    assert route_steps[0]["output_payload"]["selected_model"] == "meta/llama-3.1-8b-instruct"
+
+
+def test_calibration_adjusts_escalation_threshold(orch_env, monkeypatch):
+    """FR-15 calibration adjusts threshold: high P(correct) lowers threshold so 0.45 confidence resolves."""
+    from app.core.tracing import TraceWriter
+
+    factory, _, _ = _script(
+        monkeypatch, orch_env, ["PROPOSED ACTION: refund $10\nCONFIDENCE: 0.45"]
+    )
+
+    class HighTrustCalibrator:
+        def predict_probability(self, **kwargs):
+            return 0.95  # very high confidence in agent decision
+
+    import app.ml.calibration as cal_mod
+
+    monkeypatch.setattr(cal_mod, "load_calibration", lambda *args, **kwargs: HighTrustCalibrator())
+
+    res = orch.process_ticket("tk-cal", "issue", "details", "CUST-1001")
+
+    # Under base threshold (0.60), 0.45 would retry/escalate. Under calibrated threshold (0.375), it resolves!
+    assert res["outcome"] == "resolved"
+
+    steps = TraceWriter(factory).get_trace("tk-cal")
+    decision_steps = [s for s in steps if s["name"] == "orchestrator_resolve"]
+    assert len(decision_steps) == 1
+    payload = decision_steps[0]["input_payload"]
+    assert payload["calibrated_threshold"] < payload["base_threshold"]
+    assert payload["p_correct"] == 0.95
+

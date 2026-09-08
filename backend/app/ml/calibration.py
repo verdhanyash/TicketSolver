@@ -188,7 +188,7 @@ def _load_bundle(models_dir: str) -> dict:
     if not path.is_file():
         raise FileNotFoundError(
             f"No calibration bundle at {path} (expected file '{BUNDLE_NAME}'). "
-            "Train one first: python scripts/train_router.py"
+            "Train one first: python scripts/train_calibration.py"
         )
     bundle = joblib.load(path)
     version = bundle.get("version")
