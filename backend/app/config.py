@@ -52,10 +52,16 @@ class Settings(BaseSettings):
     llm_breaker_failures: int = 3
     llm_breaker_reset_s: float = 60.0
 
-    # Orchestrator (FR-4): bounded retry-on-low-confidence; LLM self-reported
-    # confidence until calibration replaces it (M7)
+    # Orchestrator (FR-4): bounded retry-on-low-confidence; the LLM self-reported
+    # confidence stays the primary signal, FR-15 calibration only adjusts the threshold
     orchestrator_max_attempts: int = 2
     confidence_threshold: float = 0.6
+
+    # ML serving switches (M7). The FR-14 complexity router and FR-15 calibration
+    # already degrade gracefully when their joblib bundles are absent; these flags
+    # additionally hard-disable the seams (e.g. to bisect a live incident).
+    router_enabled: bool = True
+    calibration_enabled: bool = True
 
     @property
     def cors_origins_list(self) -> list[str]:
